@@ -37,7 +37,7 @@
 
 ## 功能
 
-### LLM 工具（10 个）
+### LLM 工具（11 个）
 
 | 工具 | 功能 |
 |---|---|
@@ -50,6 +50,7 @@
 | `send_private_image` | 向指定 **QQ 用户**发送私聊图片（可带文字） |
 | `get_group_list` | 获取机器人加入的所有群（群号 + 群名） |
 | `get_group_message_history` | 🆕 **跨对话查看**：读取某群最近 N 条历史消息（联动日志归档插件） |
+| `search_archived_messages` | 🆕 **归档搜索**：按日期 / QQ UID / QQ 名称 / 关键词**纯程序过滤**搜索消息（联动日志归档插件） |
 | `list_archived_groups` | 🆕 列出已归档聊天记录的群号（联动日志归档插件） |
 
 ### 权限控制
@@ -68,6 +69,29 @@ LLM: 群 987654321 最近 20 条消息:
 ```
 
 LLM 可先调用 `list_archived_groups` 知道哪些群有归档，再调用 `get_group_message_history(group_id, count)` 查看内容，并结合"可靠记忆"长期掌握各群动态。
+
+### 归档搜索（纯程序过滤）
+
+`search_archived_messages(group_id, keyword, date, user_id, nickname, count)` 在插件内直接对归档文件做**程序化过滤**（不经过 LLM 推理搜索），支持条件**组合**使用：
+
+| 参数 | 说明 |
+|---|---|
+| `group_id` | 目标群号（必填） |
+| `keyword` | 消息内容关键词（子串匹配，不区分大小写） |
+| `date` | 指定日期 `YYYY-MM-DD`（只搜该天归档） |
+| `user_id` | QQ UID 精确匹配（仅当日志归档含 QQ 号时有效） |
+| `nickname` | QQ 名称子串匹配 |
+| `count` | 返回条数上限（默认 20，最大 100） |
+
+```
+用户: 上周群里关于"周末聚餐"都聊了什么？
+LLM: 调用 search_archived_messages(group_id="987654321", keyword="聚餐", count=20)
+     → 群 987654321 搜索到 3 条消息（关键词[聚餐]）:
+        [08-23 12:01] 张三: 这周聚餐还是老地方吗
+        ...
+```
+
+> 💡 搜索基于归档文件内容（昵称 + 消息文本）。QQ UID 过滤需要归档包含 QQ 号（`event_bus` 源格式）；若归档为 `group_chat_context` 源（无 QQ 号行内），该条件将不命中任何行，请改用昵称/关键词/日期过滤。
 
 > ⚠️ 查看范围受联动插件归档内容限制（仅群聊、需先积累归档、脱敏配置会影响内容）。
 

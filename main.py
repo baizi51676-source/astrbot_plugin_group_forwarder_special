@@ -154,6 +154,7 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 内�
                 "nickname": d["nickname"].strip(),
                 "msg_time": d["msg_time"],
                 "content": d["content"].strip(),
+                "user_id": None,  # group_chat_context 行不含 QQ 号
             }
         # 格式 2：event_bus（无群号，兼容 unknown 归档）
         m2 = re.match(
@@ -171,6 +172,7 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 内�
                 "nickname": d["nickname"].strip(),
                 "msg_time": d["time"],
                 "content": d["content"].strip(),
+                "user_id": d["user_id"],
             }
         return None
 
@@ -205,6 +207,58 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 内�
             all_msgs = parsed + all_msgs
         return [f"[{m['msg_time']}] {m['nickname']}: {m['content']}"
                 for m in all_msgs[-count:]]
+
+    def _search_group_history(self, group_id: str, count: int = 20,
+                              keyword: str | None = None,
+                              date: str | None = None,
+                              user_id: str | None = None,
+                              nickname: str | None = None) -> list:
+        """纯程序过滤搜索归档消息（不依赖 LLM），返回格式化文本行。
+
+        过滤条件（可组合，全部满足才命中）：
+          keyword : 消息内容包含该关键词（不区分大小写，子串匹配）
+          date    : 仅搜索指定日期（YYYY-MM-DD）的归档文件
+          user_id : QQ UID 精确匹配（仅 event_bus 格式归档含 QQ 号，其余行忽略该条件）
+          nickname: 昵称包含该字符串（子串匹配）
+        从新到旧扫描归档文件，收集满 count 条即返回（保证是最新命中）。
+        """
+        gid = group_id.strip()
+        files = self._group_archive_files(gid)
+        if date:
+            wanted = f"astrbot_{gid}_{date}.log"
+            files = [p for p in files if p.name == wanted]
+        kw = keyword.strip() if keyword else None
+        uid = user_id.strip() if user_id else None
+        nick = nickname.strip() if nickname else None
+        hits: list[dict] = []
+        for fpath in files:  # 已按日期倒序（新 → 旧）
+            try:
+                with open(fpath, encoding="utf-8", errors="replace") as f:
+                    raw_lines = f.readlines()
+            except Exception as e:
+                logger.error(f"读取归档文件失败 {fpath}: {e}")
+                continue
+            for raw in raw_lines:
+                info = self._parse_archive_line(raw)
+                if not info:
+                    continue
+                if kw and kw.lower() not in info["content"].lower():
+                    continue
+                if uid:
+                    # group_chat_context 行无 QQ 号，无法匹配则跳过
+                    if info.get("user_id") is None or info["user_id"] != uid:
+                        continue
+                if nick and nick.lower() not in info["nickname"].lower():
+                    continue
+                hits.append(info)
+                if len(hits) >= count:
+                    break
+            if len(hits) >= count:
+                break
+        # hits 扫描顺序为 新→旧，反转成 旧→新 时间正序输出
+        hits.reverse()
+        return [f"[{m['msg_time']}] {m['nickname']}: {m['content']}"
+                for m in hits]
 
     def _list_archived_groups(self) -> list:
         """扫描归档目录，返回已有归档的群号列表（按文件名提取，去重）。
@@ -551,3 +605,68 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 内�
             for g in groups
         ]
         return "已有归档记录的群:\n" + "\n".join(lines)
+
+    @filter.llm_tool("search_archived_messages")
+    async def search_archived_messages(self, event: AstrMessageEvent,
+                                       group_id: str, keyword: str = "",
+                                       date: str = "", user_id: str = "",
+                                       nickname: str = "", count: int = 20):
+        '''
+        在指定 QQ 群的归档聊天记录中按条件搜索消息（纯程序过滤，速度快、准确）。
+        适合查找特定关键词、某天/某人的聊天内容，例如"上周群里关于XX的讨论"。
+
+        参数（均为过滤条件，可组合使用，全部满足才命中）:
+          group_id: 目标 QQ 群号（纯数字，如 "123456789"；必填）
+          keyword: 消息内容关键词（子串匹配，不区分大小写；可选）
+          date: 指定日期，格式 YYYY-MM-DD，如 "2026-08-23"（只搜该天的归档；可选）
+          user_id: 指定 QQ UID（精确匹配；注意：仅当日志归档含 QQ 号时有效，可选）
+          nickname: 指定 QQ 名称（昵称子串匹配，如 "夏目"；可选）
+          count: 返回条数上限（默认 20，最大 100）
+
+        返回: 按时间顺序排列的匹配消息（时间/昵称/内容）。若没有任何条件（除 group_id 外），
+        等价于查看该群最近的 count 条消息。
+        '''
+        if not self._is_allowed(event):
+            return "❌ 无权限：仅管理员可以使用跨群查看工具。"
+        gid = group_id.strip()
+        if not gid.isdigit():
+            return f"❌ 群号格式错误：{group_id}。群号应为纯数字。"
+        try:
+            count = max(1, min(int(count), 100))
+        except (TypeError, ValueError):
+            count = 20
+        try:
+            msgs = self._search_group_history(
+                gid, count,
+                keyword=keyword or None,
+                date=date or None,
+                user_id=user_id or None,
+                nickname=nickname or None,
+            )
+        except Exception as e:
+            logger.error(f"搜索归档消息失败: {e}")
+            return f"❌ 搜索失败: {e}"
+        if not msgs:
+            conds = []
+            if keyword:
+                conds.append(f"关键词[{keyword}]")
+            if date:
+                conds.append(f"日期[{date}]")
+            if user_id:
+                conds.append(f"QQ[{user_id}]")
+            if nickname:
+                conds.append(f"昵称[{nickname}]")
+            cond_str = ("、".join(conds)) if conds else "无过滤条件"
+            return f"📭 群 {gid} 中未找到匹配消息（{cond_str}）。"
+        conds = []
+        if keyword:
+            conds.append(f"关键词[{keyword}]")
+        if date:
+            conds.append(f"日期[{date}]")
+        if user_id:
+            conds.append(f"QQ[{user_id}]")
+        if nickname:
+            conds.append(f"昵称[{nickname}]")
+        cond_str = ("，".join(conds)) if conds else "最近消息"
+        return (f"群 {gid} 搜索到 {len(msgs)} 条消息（{cond_str}）:\n"
+                + "\n".join(msgs))
