@@ -27,9 +27,13 @@
 - 本插件负责：读取归档文件，解析出时间/昵称/内容，为 LLM 提供查询工具
 
 **使用前提**（两个插件需同时启用）：
-1. 安装并启用 `astrbot_plugin_group_log_archive`，确认其能正常产出归档文件（可配置 `auto_enable_debug` 自动开启 AstrBot DEBUG + 文件日志）
+1. 安装并启用 `astrbot_plugin_group_log_archive`，确认其能正常产出归档文件
 2. 本插件 WebUI 配置项 `log_dir` 与归档插件的 `output_dir` 保持一致（默认均为 `data/workspaces/group_logs`）
 3. 归档插件需持续运行积累消息后，本插件才能查到历史记录
+
+> **💡 日志源模式说明**（对应归档插件的 `log_source` 配置）：
+> - **推荐：`group_chat_context` 模式**（含群号，按群归档）——在归档插件配置中开启 `auto_enable_debug`（或手动设置 AstrBot `log_level=DEBUG` + 文件日志），重启 AstrBot 生效。归档文件名为 `astrbot_<群号>_YYYY-MM-DD.log`，可按群精确查询。
+> - **兜底：`event_bus` 模式**（INFO 即可，无群号）——未开 DEBUG 时自动使用，归档为 `astrbot_unknown_YYYY-MM-DD.log`。本插件仍可读取（按时间倒序），但无法按群过滤；`list_archived_groups` 会显示 `unknown` 并提示开启 DEBUG。
 
 ## 功能
 

@@ -127,29 +127,52 @@ class GroupForwarderSpecial(Star):
     def _parse_archive_line(self, line: str) -> dict | None:
         """解析群聊日志归档行（astrbot_plugin_group_log_archive 输出格式）。
 
-        示例行:
-        [2026-08-22 01:33:55.519] [Plug] [DBUG] [astrbot.group_chat_context:158]: \
-group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 消息内容
+        支持两种日志源（对应归档插件的 log_source 配置）：
+        1) group_chat_context（需 AstrBot DEBUG，含群号）:
+           [2026-08-22 01:33:55.519] [Plug] [DBUG] [astrbot.group_chat_context:158]: \
+group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 内容
+        2) event_bus（INFO 即可，无群号）:
+           [2026-08-22 23:59:29.133] [Core] [INFO] [core.event_bus:74]: [default] [账号1(aiocqhttp)] 昵称/QQ: 内容
 
         返回: {"time","group_id","nickname","msg_time","content"}；解析失败返回 None。
+        event_bus 行无群号，group_id 固定为 "unknown"。
         """
+        line = line.strip()
+        # 格式 1：group_chat_context（含群号）
         m = re.match(
             r"^\[\d{4}-\d{2}-\d{2} (?P<time>\d{2}:\d{2}:\d{2})\.\d+\] "
             r"\[Plug\] \[DBUG\] \[astrbot\.group_chat_context:\d+\]: "
             r"group_chat_context \| pre-config:GroupMessage:(?P<group_id>\d+) \| "
-            r"\[(?P<nickname>[^\]]+)/(?P<msg_time>[\d:]+)\]: (?P<content>.*)$",
-            line.strip(),
+            r"\[(?P<nickname>[^\]]+)/(?P<msg_time>[\d:]+)\]: ?(?P<content>.*)$",
+            line,
         )
-        if not m:
-            return None
-        d = m.groupdict()
-        return {
-            "time": d["time"],
-            "group_id": d["group_id"],
-            "nickname": d["nickname"].strip(),
-            "msg_time": d["msg_time"],
-            "content": d["content"].strip(),
-        }
+        if m:
+            d = m.groupdict()
+            return {
+                "time": d["time"],
+                "group_id": d["group_id"],
+                "nickname": d["nickname"].strip(),
+                "msg_time": d["msg_time"],
+                "content": d["content"].strip(),
+            }
+        # 格式 2：event_bus（无群号，兼容 unknown 归档）
+        m2 = re.match(
+            r"^\[\d{4}-\d{2}-\d{2} (?P<time>\d{2}:\d{2}:\d{2})\.\d+\] "
+            r"\[Core\] \[INFO\] \[core\.event_bus:\d+\]: \[default\] "
+            r"\[(?P<account>[^\]]+)\] (?P<nickname>.+?)/(?P<user_id>\d+): ?"
+            r"(?P<content>.*)$",
+            line,
+        )
+        if m2:
+            d = m2.groupdict()
+            return {
+                "time": d["time"],
+                "group_id": "unknown",
+                "nickname": d["nickname"].strip(),
+                "msg_time": d["time"],
+                "content": d["content"].strip(),
+            }
+        return None
 
     def _group_archive_files(self, group_id: str) -> list:
         """返回某群所有归档文件的路径，按日期倒序（新 → 旧）。"""
@@ -184,14 +207,17 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 消�
                 for m in all_msgs[-count:]]
 
     def _list_archived_groups(self) -> list:
-        """扫描归档目录，返回已有归档的群号列表（按文件名提取，去重）。"""
+        """扫描归档目录，返回已有归档的群号列表（按文件名提取，去重）。
+
+        含 "unknown"（event_bus 日志源产生的未分群归档）。
+        """
         log_dir = Path(self.log_dir)
         if not log_dir.is_dir():
             return []
         groups = set()
         for p in log_dir.iterdir():
             if p.is_file() and p.name.startswith("astrbot_"):
-                m = re.match(r"astrbot_(\d+)_\d{4}-\d{2}-\d{2}\.log$", p.name)
+                m = re.match(r"astrbot_(.+?)_\d{4}-\d{2}-\d{2}\.log$", p.name)
                 if m:
                     groups.add(m.group(1))
         return sorted(groups)
@@ -494,6 +520,13 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 消�
             count = 20
         msgs = self._read_group_history(group_id.strip(), count)
         if not msgs:
+            # 若存在 unknown 归档（event_bus 源），给出诊断引导
+            if "unknown" in self._list_archived_groups():
+                return (f"📭 群 {group_id} 暂无归档消息。检测到归档插件当前使用 "
+                        f"event_bus 日志源（无群号，归档为 unknown 文件）。\n"
+                        f"请在联动插件 astrbot_plugin_group_log_archive 的 WebUI 配置中"
+                        f"开启 auto_enable_debug（或手动设置 AstrBot log_level=DEBUG + "
+                        f"文件日志），重启 AstrBot 后即可按群归档。")
             return (f"📭 群 {group_id} 暂无归档消息。请确认已启用联动插件 "
                     f"astrbot_plugin_group_log_archive 且归档目录配置正确"
                     f"（当前配置: {self.log_dir}），并且该群有消息被归档。")
@@ -512,4 +545,9 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 消�
             return (f"📭 暂无归档群聊。请确认已启用联动插件 "
                     f"astrbot_plugin_group_log_archive 且归档目录配置正确"
                     f"（当前配置: {self.log_dir}）。")
-        return "已有归档记录的群:\n" + "\n".join(groups)
+        lines = [
+            "unknown（未分群，event_bus 日志源，建议开启 DEBUG 以按群归档）"
+            if g == "unknown" else g
+            for g in groups
+        ]
+        return "已有归档记录的群:\n" + "\n".join(lines)
