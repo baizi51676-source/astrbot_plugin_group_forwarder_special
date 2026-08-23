@@ -52,6 +52,9 @@ class GroupForwarderSpecial(Star):
         # 联动：群聊日志归档目录（astrbot_plugin_group_log_archive 的输出目录）
         self.log_dir = str(config.get("log_dir", "data/workspaces/group_logs")) \
             or "data/workspaces/group_logs"
+        # 联动：NapCat 历史导出目录（astrbot_plugin_napcat_history_exporter 的 export_dir）
+        self.export_dir = str(config.get("export_dir", "data/workspaces/napcat_exports")) \
+            or "data/workspaces/napcat_exports"
 
     # ---------------------------------------------------------------
     # 内部工具方法
@@ -195,22 +198,29 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 内�
             }
         return None
 
+    def _archive_dirs(self) -> list:
+        """返回所有归档数据源目录（日志归档 + NapCat 历史导出）。"""
+        dirs = []
+        for d in (self.log_dir, self.export_dir):
+            if d and Path(d).is_dir():
+                dirs.append(Path(d))
+        return dirs
+
     def _group_archive_files(self, group_id: str) -> list:
         """返回某群所有归档文件的路径，按日期倒序（新 → 旧）。
 
-        同时匹配两类联动文件：
+        同时匹配两类联动文件（分布在两个数据源目录）：
         - astrbot_<群号>_YYYY-MM-DD.log（astrbot_plugin_group_log_archive）
         - napcat_<群号>_YYYY-MM-DD.jsonl（astrbot_plugin_napcat_history_exporter）
         """
-        log_dir = Path(self.log_dir)
-        if not log_dir.is_dir():
-            return []
         gid = group_id.strip()
         prefixes = (f"astrbot_{gid}_", f"napcat_{gid}_")
-        files = [p for p in log_dir.iterdir()
-                 if p.is_file()
-                 and p.name.startswith(prefixes)
-                 and (p.name.endswith(".log") or p.name.endswith(".jsonl"))]
+        files: list = []
+        for log_dir in self._archive_dirs():
+            files += [p for p in log_dir.iterdir()
+                      if p.is_file()
+                      and p.name.startswith(prefixes)
+                      and (p.name.endswith(".log") or p.name.endswith(".jsonl"))]
         files.sort(key=lambda p: p.name, reverse=True)
         return files
 
@@ -287,23 +297,21 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 内�
                 for m in hits]
 
     def _list_archived_groups(self) -> list:
-        """扫描归档目录，返回已有归档的群号列表（按文件名提取，去重）。
+        """扫描全部归档数据源目录，返回已有归档的群号列表（去重）。
 
         含 "unknown"（event_bus 日志源产生的未分群归档）。
         同时识别 astrbot_*.log 与 napcat_*.jsonl 两类文件。
         """
-        log_dir = Path(self.log_dir)
-        if not log_dir.is_dir():
-            return []
         groups = set()
-        for p in log_dir.iterdir():
-            if not p.is_file() or not p.name.startswith(("astrbot_", "napcat_")):
-                continue
-            m = re.match(
-                r"(?:astrbot|napcat)_(.+?)_\d{4}-\d{2}-\d{2}\.(?:log|jsonl)$",
-                p.name)
-            if m:
-                groups.add(m.group(1))
+        for log_dir in self._archive_dirs():
+            for p in log_dir.iterdir():
+                if not p.is_file() or not p.name.startswith(("astrbot_", "napcat_")):
+                    continue
+                m = re.match(
+                    r"(?:astrbot|napcat)_(.+?)_\d{4}-\d{2}-\d{2}\.(?:log|jsonl)$",
+                    p.name)
+                if m:
+                    groups.add(m.group(1))
         return sorted(groups)
 
     async def _send_to_group(self, event: AstrMessageEvent, group_id: str,

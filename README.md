@@ -95,14 +95,20 @@ LLM: 调用 search_archived_messages(group_id="987654321", keyword="聚餐", cou
 
 ## 联动数据源（两类，自动识别）
 
-本插件可同时读取以下两个插件产出的归档文件（目录由 `log_dir` 配置，**自动混合解析，无需区分**）：
+本插件同时扫描两个数据源目录（默认均位于 AstrBot 工作目录的 `data/workspaces/` 下，配置项 `log_dir` / `export_dir` 可分别调整），**自动混合解析，无需区分**：
+
+```
+data/workspaces/
+├── group_logs/      ← 日志归档插件（astrbot_plugin_group_log_archive）：astrbot_<群号>_*.log
+└── napcat_exports/  ← 历史导出插件（astrbot_plugin_napcat_history_exporter）：napcat_<群号>_*.jsonl
+```
 
 | 数据源 | 插件 | 文件 | 说明 |
 |---|---|---|---|
 | 日志归档 | `astrbot_plugin_group_log_archive` | `astrbot_<群号>_YYYY-MM-DD.log` | 依赖 AstrBot DEBUG 日志，含群号；`event_bus` 源时为 `unknown` |
 | 历史导出 | `astrbot_plugin_napcat_history_exporter` | `napcat_<群号>_YYYY-MM-DD.jsonl` | NapCat 扩展 API 直接导出，含 **QQ UID**，支持增量（推荐搭配） |
 
-> 💡 推荐方案：用 `astrbot_plugin_napcat_history_exporter`（auto 模式每 120s 增量导出）作为主要数据源，日志归档插件作为补充/兜底；`log_dir` 可指向导出器的 `export_dir`。
+> 💡 推荐方案：用 `astrbot_plugin_napcat_history_exporter`（auto 模式每 120s 增量导出，输出到 `data/workspaces/napcat_exports`）作为主要数据源，日志归档插件作为补充/兜底；两边配置保持默认即可互通。
 
 > ⚠️ 查看范围受联动插件归档内容限制（仅群聊、需先积累归档、脱敏配置会影响内容）。
 

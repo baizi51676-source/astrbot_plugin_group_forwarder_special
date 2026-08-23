@@ -5,6 +5,12 @@
     "default": "data/workspaces/group_logs",
     "hint": "留空使用默认 data/workspaces/group_logs。需与日志归档插件的 output_dir 配置保持一致。"
   },
+  "export_dir": {
+    "description": "NapCat 历史导出目录（联动 astrbot_plugin_napcat_history_exporter 的 export_dir）",
+    "type": "string",
+    "default": "data/workspaces/napcat_exports",
+    "hint": "留空使用默认 data/workspaces/napcat_exports。需与导出插件的 export_dir 配置保持一致。两个目录都会被扫描，无需合并。"
+  },
   "admin_only": {
     "description": "仅管理员可以使用",
     "type": "bool",
