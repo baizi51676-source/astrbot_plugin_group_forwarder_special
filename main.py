@@ -387,9 +387,9 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 内�
         '''
         向指定的 QQ 群（按群号/群 UID）发送一条文本消息。适合通知、提醒、转发信息等场景。
 
-        参数:
-          group_id: 目标 QQ 群号（纯数字，如 "123456789"）
-          message: 要发送的文本内容
+        Args:
+          group_id(string): 目标 QQ 群号（纯数字，如 "123456789"）
+          message(string): 要发送的文本内容
 
         返回: 发送结果的描述
         '''
@@ -405,14 +405,10 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 内�
                                   group_id: str, image_url: str, caption: str = ""):
         '''
         向指定的 QQ 群（按群号/群 UID）发送一张图片，可附带文字说明。
-
-        参数:
-          group_id: 目标 QQ 群号（纯数字，如 "123456789"）
-          image_url: 图片地址。支持：
-                     - http(s):// 开头的网络图片 URL
-                     - 机器人本机（NapCat 所在机器）可访问的图片文件路径
-                     - file:// 开头的本地文件路径
-          caption: 可选，附带发送的文字说明
+        Args:
+          group_id(string): 目标 QQ 群号（纯数字，如 "123456789"）
+          image_url(string): 图片地址，支持 http(s):// 网络 URL、file:// 或本机可访问的图片文件路径
+          caption(string): 可选，附带发送的文字说明
 
         返回: 发送结果的描述
         '''
@@ -430,12 +426,10 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 内�
                                   group_id: str, voice_url: str, caption: str = ""):
         '''
         向指定的 QQ 群（按群号/群 UID）发送一条语音消息，可附带文字说明。
-
-        参数:
-          group_id: 目标 QQ 群号（纯数字，如 "123456789"）
-          voice_url: 语音文件地址（http(s):// 网络 URL、file:// 或本地路径），
-                     通常为 .mp3/.amr/.silk 等 NapCat 支持的格式
-          caption: 可选，附带发送的文字说明
+        Args:
+          group_id(string): 目标 QQ 群号（纯数字，如 "123456789"）
+          voice_url(string): 语音文件地址，支持 http(s):// 网络 URL、file:// 或本机路径，通常为 .mp3/.amr/.silk 格式
+          caption(string): 可选，附带发送的文字说明
 
         返回: 发送结果的描述
         '''
@@ -454,10 +448,10 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 内�
         '''
         向指定的 QQ 群（按群号/群 UID）发送一个文件，可附带文字说明。
 
-        参数:
-          group_id: 目标 QQ 群号（纯数字，如 "123456789"）
-          file_url: 文件地址（http(s):// 网络 URL、file:// 或本地路径）
-          caption: 可选，附带发送的文字说明
+        Args:
+          group_id(string): 目标 QQ 群号（纯数字，如 "123456789"）
+          file_url(string): 文件地址（http(s):// 网络 URL、file:// 或本地路径）
+          caption(string): 可选，附带发送的文字说明
 
         返回: 发送结果的描述
         '''
@@ -476,9 +470,9 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 内�
         '''
         向指定的 QQ 群发送合并转发消息（多条消息打包为一条转发卡片）。
 
-        参数:
-          group_id: 目标 QQ 群号（纯数字，如 "123456789"）
-          messages: 要合并转发的多条消息内容（字符串数组，按顺序排列）
+        Args:
+          group_id(string): 目标 QQ 群号（纯数字，如 "123456789"）
+          messages(string): 要合并转发的多条消息内容（字符串数组，按顺序排列）
 
         返回: 发送结果的描述
         '''
@@ -540,9 +534,9 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 内�
         '''
         向指定的 QQ 用户（按 QQ 号）发送一条私聊文本消息。
 
-        参数:
-          user_id: 目标 QQ 号（纯数字，如 "123456789"）
-          message: 要发送的文本内容
+        Args:
+          user_id(string): 目标 QQ 号（纯数字，如 "123456789"）
+          message(string): 要发送的文本内容
 
         返回: 发送结果的描述
         '''
@@ -559,10 +553,10 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 内�
         '''
         向指定的 QQ 用户（按 QQ 号）发送一张图片，可附带文字说明。
 
-        参数:
-          user_id: 目标 QQ 号（纯数字，如 "123456789"）
-          image_url: 图片地址（http(s):// 网络 URL、file:// 或本地路径）
-          caption: 可选，附带发送的文字说明
+        Args:
+          user_id(string): 目标 QQ 号（纯数字，如 "123456789"）
+          image_url(string): 图片地址（http(s):// 网络 URL、file:// 或本地路径）
+          caption(string): 可选，附带发送的文字说明
 
         返回: 发送结果的描述
         '''
@@ -611,9 +605,9 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 内�
         查看指定 QQ 群的历史聊天记录（读取群聊日志归档插件的归档文件）。
         适合需要了解某个群最近聊了什么、查找过往消息、回顾上下文等场景。
 
-        参数:
-          group_id: 目标 QQ 群号（纯数字，如 "123456789"）
-          count: 需要获取的消息条数（默认 20，最大 100）
+        Args:
+          group_id(string): 目标 QQ 群号（纯数字，如 "123456789"）
+          count(string): 需要获取的消息条数（默认 20，最大 100）
 
         返回: 按时间顺序排列的消息列表（时间/昵称/内容）
         '''
@@ -668,13 +662,13 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 内�
         在指定 QQ 群的归档聊天记录中按条件搜索消息（纯程序过滤，速度快、准确）。
         适合查找特定关键词、某天/某人的聊天内容，例如"上周群里关于XX的讨论"。
 
-        参数（均为过滤条件，可组合使用，全部满足才命中）:
-          group_id: 目标 QQ 群号（纯数字，如 "123456789"；必填）
-          keyword: 消息内容关键词（子串匹配，不区分大小写；可选）
-          date: 指定日期，格式 YYYY-MM-DD，如 "2026-08-23"（只搜该天的归档；可选）
-          user_id: 指定 QQ UID（精确匹配；注意：仅当日志归档含 QQ 号时有效，可选）
-          nickname: 指定 QQ 名称（昵称子串匹配，如 "夏目"；可选）
-          count: 返回条数上限（默认 20，最大 100）
+        Args:
+          group_id(string): 目标 QQ 群号（纯数字，如 "123456789"；必填）
+          keyword(string): 消息内容关键词（子串匹配，不区分大小写；可选）
+          date(string): 指定日期，格式 YYYY-MM-DD，如 "2026-08-23"（只搜该天的归档；可选）
+          user_id(string): 指定 QQ UID（精确匹配；可选）
+          nickname(string): 指定 QQ 名称（昵称子串匹配，如 "夏目"；可选）
+          count(number): 返回条数上限（默认 20，最大 100）
 
         返回: 按时间顺序排列的匹配消息（时间/昵称/内容）。若没有任何条件（除 group_id 外），
         等价于查看该群最近的 count 条消息。
