@@ -55,6 +55,10 @@ class GroupForwarderSpecial(Star):
         # 联动：NapCat 历史导出目录（astrbot_plugin_napcat_history_exporter 的 export_dir）
         self.export_dir = str(config.get("export_dir", "data/workspaces/napcat_exports")) \
             or "data/workspaces/napcat_exports"
+        # 联动模式：auto（默认，双源自动扫描）/ napcat（仅历史导出器）/ log_archive（仅日志归档）
+        self.link_mode = str(config.get("link_mode", "auto")).strip().lower()
+        if self.link_mode not in ("auto", "napcat", "log_archive"):
+            self.link_mode = "auto"
 
     # ---------------------------------------------------------------
     # 内部工具方法
@@ -199,9 +203,20 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 内�
         return None
 
     def _archive_dirs(self) -> list:
-        """返回所有归档数据源目录（日志归档 + NapCat 历史导出）。"""
+        """按联动模式（link_mode）返回归档数据源目录。
+
+        - auto:        同时扫描日志归档 + NapCat 历史导出两个目录（默认）
+        - napcat:      仅扫描 NapCat 历史导出目录（export_dir）
+        - log_archive: 仅扫描日志归档目录（log_dir）
+        """
+        if self.link_mode == "napcat":
+            candidates = (self.export_dir,)
+        elif self.link_mode == "log_archive":
+            candidates = (self.log_dir,)
+        else:  # auto
+            candidates = (self.log_dir, self.export_dir)
         dirs = []
-        for d in (self.log_dir, self.export_dir):
+        for d in candidates:
             if d and Path(d).is_dir():
                 dirs.append(Path(d))
         return dirs

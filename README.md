@@ -93,9 +93,17 @@ LLM: 调用 search_archived_messages(group_id="987654321", keyword="聚餐", cou
 
 > 💡 搜索基于归档文件内容（昵称 + 消息文本）。QQ UID 过滤需要归档包含 QQ 号（`event_bus` 源格式或 **NapCat 导出器的 JSONL**）；若归档为 `group_chat_context` 源（无 QQ 号行内），该条件将不命中任何行，请改用昵称/关键词/日期过滤。
 
-## 联动数据源（两类，自动识别）
+## 联动数据源（三类联动模式，自动识别）
 
-本插件同时扫描两个数据源目录（默认均位于 AstrBot 工作目录的 `data/workspaces/` 下，配置项 `log_dir` / `export_dir` 可分别调整），**自动混合解析，无需区分**：
+本插件通过配置项 `link_mode` 选择数据源，默认 **auto**（同时扫描两个目录，自动混合解析）：
+
+| 模式 | 值 | 扫描目录 | 适用场景 |
+|---|---|---|---|
+| 🏷️ Auto（默认）| `auto` | `log_dir` + `export_dir` | 两个插件都用，自动合并 |
+| 📦 NapCat 导出器 | `napcat` | 仅 `export_dir` | 只用 `astrbot_plugin_napcat_history_exporter` |
+| 📜 日志归档 | `log_archive` | 仅 `log_dir` | 只用 `astrbot_plugin_group_log_archive` |
+
+默认目录结构（均位于 AstrBot 工作目录的 `data/workspaces/` 下）：
 
 ```
 data/workspaces/
@@ -119,6 +127,8 @@ data/workspaces/
 | 配置项 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
 | `log_dir` | string | `data/workspaces/group_logs` | 🆕 日志归档目录（与联动插件 `output_dir` 一致） |
+| `export_dir` | string | `data/workspaces/napcat_exports` | 🆕 NapCat 历史导出目录（与导出插件 `export_dir` 一致） |
+| `link_mode` | string | `auto` | 🆕 联动模式：`auto` 双源 / `napcat` 仅导出器 / `log_archive` 仅日志归档 |
 | `admin_only` | bool | `true` | 仅 AstrBot 管理员可用 |
 | `allowed_user_ids` | list | `[]` | 允许使用的用户 QQ 号（`admin_only=false` 时生效） |
 | `allowed_groups` | list | `[]` | 目标群白名单：仅允许向这些群发送消息，留空不限制 |

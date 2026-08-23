@@ -9,7 +9,13 @@
     "description": "NapCat 历史导出目录（联动 astrbot_plugin_napcat_history_exporter 的 export_dir）",
     "type": "string",
     "default": "data/workspaces/napcat_exports",
-    "hint": "留空使用默认 data/workspaces/napcat_exports。需与导出插件的 export_dir 配置保持一致。两个目录都会被扫描，无需合并。"
+    "hint": "留空使用默认 data/workspaces/napcat_exports。需与导出插件的 export_dir 配置保持一致。"
+  },
+  "link_mode": {
+    "description": "联动模式（数据源选择）",
+    "type": "string",
+    "default": "auto",
+    "hint": "auto=自动扫描两个数据源（日志归档 group_logs + 历史导出 napcat_exports）；napcat=仅使用 astrbot_plugin_napcat_history_exporter 的文件；log_archive=仅使用 astrbot_plugin_group_log_archive 的文件。"
   },
   "admin_only": {
     "description": "仅管理员可以使用",
