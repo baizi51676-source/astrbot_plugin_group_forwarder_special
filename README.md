@@ -49,9 +49,9 @@
 | `send_private_message` | 向指定 **QQ 用户**发送私聊文本消息 |
 | `send_private_image` | 向指定 **QQ 用户**发送私聊图片（可带文字） |
 | `get_group_list` | 获取机器人加入的所有群（群号 + 群名） |
-| `get_group_message_history` | 🆕 **跨对话查看**：读取某群最近 N 条历史消息（联动日志归档插件） |
-| `search_archived_messages` | 🆕 **归档搜索**：按日期 / QQ UID / QQ 名称 / 关键词**纯程序过滤**搜索消息（联动日志归档插件） |
-| `list_archived_groups` | 🆕 列出已归档聊天记录的群号（联动日志归档插件） |
+| `get_group_message_history` | 🆕 **跨对话查看**：读取某群最近 N 条历史消息（联动日志归档/历史导出插件） |
+| `search_archived_messages` | 🆕 **归档搜索**：按日期 / QQ UID / QQ 名称 / 关键词**纯程序过滤**搜索消息（联动日志归档/历史导出插件） |
+| `list_archived_groups` | 🆕 列出已归档聊天记录的群号（联动日志归档/历史导出插件） |
 
 ### 权限控制
 
@@ -91,7 +91,18 @@ LLM: 调用 search_archived_messages(group_id="987654321", keyword="聚餐", cou
         ...
 ```
 
-> 💡 搜索基于归档文件内容（昵称 + 消息文本）。QQ UID 过滤需要归档包含 QQ 号（`event_bus` 源格式）；若归档为 `group_chat_context` 源（无 QQ 号行内），该条件将不命中任何行，请改用昵称/关键词/日期过滤。
+> 💡 搜索基于归档文件内容（昵称 + 消息文本）。QQ UID 过滤需要归档包含 QQ 号（`event_bus` 源格式或 **NapCat 导出器的 JSONL**）；若归档为 `group_chat_context` 源（无 QQ 号行内），该条件将不命中任何行，请改用昵称/关键词/日期过滤。
+
+## 联动数据源（两类，自动识别）
+
+本插件可同时读取以下两个插件产出的归档文件（目录由 `log_dir` 配置，**自动混合解析，无需区分**）：
+
+| 数据源 | 插件 | 文件 | 说明 |
+|---|---|---|---|
+| 日志归档 | `astrbot_plugin_group_log_archive` | `astrbot_<群号>_YYYY-MM-DD.log` | 依赖 AstrBot DEBUG 日志，含群号；`event_bus` 源时为 `unknown` |
+| 历史导出 | `astrbot_plugin_napcat_history_exporter` | `napcat_<群号>_YYYY-MM-DD.jsonl` | NapCat 扩展 API 直接导出，含 **QQ UID**，支持增量（推荐搭配） |
+
+> 💡 推荐方案：用 `astrbot_plugin_napcat_history_exporter`（auto 模式每 120s 增量导出）作为主要数据源，日志归档插件作为补充/兜底；`log_dir` 可指向导出器的 `export_dir`。
 
 > ⚠️ 查看范围受联动插件归档内容限制（仅群聊、需先积累归档、脱敏配置会影响内容）。
 

@@ -125,20 +125,39 @@ class GroupForwarderSpecial(Star):
         return None
 
     def _parse_archive_line(self, line: str) -> dict | None:
-        """解析群聊日志归档行（astrbot_plugin_group_log_archive 输出格式）。
+        """解析群聊记录归档行，支持三类格式：
 
-        支持两种日志源（对应归档插件的 log_source 配置）：
-        1) group_chat_context（需 AstrBot DEBUG，含群号）:
+        1) JSONL（astrbot_plugin_napcat_history_exporter 导出）:
+           {"t":"2026-08-23 12:00:00","chat":"group","group_id":"123456789",
+            "user_id":"987654321","nickname":"张三","seq":12345,"content":"..."}
+        2) group_chat_context 日志行（astrbot_plugin_group_log_archive，需 DEBUG，含群号）:
            [2026-08-22 01:33:55.519] [Plug] [DBUG] [astrbot.group_chat_context:158]: \
 group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 内容
-        2) event_bus（INFO 即可，无群号）:
+        3) event_bus 日志行（同上插件，INFO 即可，无群号）:
            [2026-08-22 23:59:29.133] [Core] [INFO] [core.event_bus:74]: [default] [账号1(aiocqhttp)] 昵称/QQ: 内容
 
-        返回: {"time","group_id","nickname","msg_time","content"}；解析失败返回 None。
-        event_bus 行无群号，group_id 固定为 "unknown"。
+        返回: {"time","group_id","nickname","msg_time","content","user_id"}；
+        解析失败返回 None。event_bus 行无群号，group_id 固定为 "unknown"。
         """
         line = line.strip()
-        # 格式 1：group_chat_context（含群号）
+        if not line:
+            return None
+        # 格式 1：JSONL（NapCat 历史导出器）
+        if line.startswith("{"):
+            try:
+                d = json.loads(line)
+                t = d.get("t", "")
+                return {
+                    "time": t,
+                    "group_id": str(d.get("group_id", "")),
+                    "nickname": d.get("nickname", ""),
+                    "msg_time": t[11:19] if len(t) >= 19 else t,
+                    "content": d.get("content", ""),
+                    "user_id": str(d.get("user_id", "") or ""),
+                }
+            except (json.JSONDecodeError, ValueError):
+                pass
+        # 格式 2：group_chat_context（含群号）
         m = re.match(
             r"^\[\d{4}-\d{2}-\d{2} (?P<time>\d{2}:\d{2}:\d{2})\.\d+\] "
             r"\[Plug\] \[DBUG\] \[astrbot\.group_chat_context:\d+\]: "
@@ -156,7 +175,7 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 内�
                 "content": d["content"].strip(),
                 "user_id": None,  # group_chat_context 行不含 QQ 号
             }
-        # 格式 2：event_bus（无群号，兼容 unknown 归档）
+        # 格式 3：event_bus（无群号，兼容 unknown 归档）
         m2 = re.match(
             r"^\[\d{4}-\d{2}-\d{2} (?P<time>\d{2}:\d{2}:\d{2})\.\d+\] "
             r"\[Core\] \[INFO\] \[core\.event_bus:\d+\]: \[default\] "
@@ -177,14 +196,21 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 内�
         return None
 
     def _group_archive_files(self, group_id: str) -> list:
-        """返回某群所有归档文件的路径，按日期倒序（新 → 旧）。"""
+        """返回某群所有归档文件的路径，按日期倒序（新 → 旧）。
+
+        同时匹配两类联动文件：
+        - astrbot_<群号>_YYYY-MM-DD.log（astrbot_plugin_group_log_archive）
+        - napcat_<群号>_YYYY-MM-DD.jsonl（astrbot_plugin_napcat_history_exporter）
+        """
         log_dir = Path(self.log_dir)
         if not log_dir.is_dir():
             return []
-        prefix = f"astrbot_{group_id.strip()}_"
+        gid = group_id.strip()
+        prefixes = (f"astrbot_{gid}_", f"napcat_{gid}_")
         files = [p for p in log_dir.iterdir()
-                 if p.is_file() and p.name.startswith(prefix)
-                 and p.name.endswith(".log")]
+                 if p.is_file()
+                 and p.name.startswith(prefixes)
+                 and (p.name.endswith(".log") or p.name.endswith(".jsonl"))]
         files.sort(key=lambda p: p.name, reverse=True)
         return files
 
@@ -264,16 +290,20 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 内�
         """扫描归档目录，返回已有归档的群号列表（按文件名提取，去重）。
 
         含 "unknown"（event_bus 日志源产生的未分群归档）。
+        同时识别 astrbot_*.log 与 napcat_*.jsonl 两类文件。
         """
         log_dir = Path(self.log_dir)
         if not log_dir.is_dir():
             return []
         groups = set()
         for p in log_dir.iterdir():
-            if p.is_file() and p.name.startswith("astrbot_"):
-                m = re.match(r"astrbot_(.+?)_\d{4}-\d{2}-\d{2}\.log$", p.name)
-                if m:
-                    groups.add(m.group(1))
+            if not p.is_file() or not p.name.startswith(("astrbot_", "napcat_")):
+                continue
+            m = re.match(
+                r"(?:astrbot|napcat)_(.+?)_\d{4}-\d{2}-\d{2}\.(?:log|jsonl)$",
+                p.name)
+            if m:
+                groups.add(m.group(1))
         return sorted(groups)
 
     async def _send_to_group(self, event: AstrMessageEvent, group_id: str,
