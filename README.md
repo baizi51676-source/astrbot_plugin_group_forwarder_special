@@ -1,0 +1,117 @@
+# 跨群消息转发插件·特殊版 (astrbot_plugin_group_forwarder_special)
+
+> ⭐ **特殊版 = 原版全部功能 + 跨对话查看消息（联动日志归档插件）**
+
+给 LLM 提供工具，使其可以在一个聊天中，向其他 QQ 群（**按群号/群 UID 指定**）发送文字/图片/语音/文件/合并转发消息、向指定 QQ 用户发送私聊消息，并**跨对话查看**各群的聊天记录。
+专为 **NapCat + AstrBot**（aiocqhttp / OneBot v11 适配器）设计。
+
+## 📦 与原版的关系
+
+本插件是 [astrbot_plugin_cross_group_forwarder](https://github.com/baizi51676-source/astrbot_plugin_cross_group_forwarder) 的**特殊增强版**：
+
+| 能力 | 原版 | 特殊版 |
+|---|---|---|
+| 跨群发送（文字/图片/语音/文件/合并转发） | ✅ | ✅ |
+| 私聊发送 | ✅ | ✅ |
+| 获取群列表 `get_group_list` | ✅ | ✅ |
+| 白名单 / 审计 / WebUI 配置 | ✅ | ✅ |
+| **跨对话查看消息** | ❌ | ✅ **新增** |
+| **联动日志归档插件** | ❌ | ✅ **新增** |
+
+## 🔗 插件联动说明
+
+**跨对话查看消息**依赖联动插件 **astrbot_plugin_group_log_archive**（群聊日志归档）：
+
+- 联动插件仓库：https://github.com/Fangnai-byte/astrbot_plugin_group_log_archive
+- 它负责：读取 AstrBot 文件日志（需 DEBUG），按天/按群导出为纯文本归档（默认 `data/workspaces/group_logs/astrbot_<群号>_YYYY-MM-DD.log`）
+- 本插件负责：读取归档文件，解析出时间/昵称/内容，为 LLM 提供查询工具
+
+**使用前提**（两个插件需同时启用）：
+1. 安装并启用 `astrbot_plugin_group_log_archive`，确认其能正常产出归档文件（可配置 `auto_enable_debug` 自动开启 AstrBot DEBUG + 文件日志）
+2. 本插件 WebUI 配置项 `log_dir` 与归档插件的 `output_dir` 保持一致（默认均为 `data/workspaces/group_logs`）
+3. 归档插件需持续运行积累消息后，本插件才能查到历史记录
+
+## 功能
+
+### LLM 工具（10 个）
+
+| 工具 | 功能 |
+|---|---|
+| `send_message_to_group` | 按**群号**向指定 QQ 群发送文本消息 |
+| `send_image_to_group` | 按**群号**向指定群发送**图片**（可带文字） |
+| `send_voice_to_group` | 按**群号**向指定群发送**语音**（可带文字） |
+| `send_file_to_group` | 按**群号**向指定群发送**文件**（可带文字） |
+| `send_forward_to_group` | 按**群号**发送**合并转发**（多条消息打包成转发卡片） |
+| `send_private_message` | 向指定 **QQ 用户**发送私聊文本消息 |
+| `send_private_image` | 向指定 **QQ 用户**发送私聊图片（可带文字） |
+| `get_group_list` | 获取机器人加入的所有群（群号 + 群名） |
+| `get_group_message_history` | 🆕 **跨对话查看**：读取某群最近 N 条历史消息（联动日志归档插件） |
+| `list_archived_groups` | 🆕 列出已归档聊天记录的群号（联动日志归档插件） |
+
+### 权限控制
+
+- 默认仅管理员可用（`admin_only = True`）
+- 设置为 `False` 时，`allowed_user_ids` 名单中的用户也可使用
+
+## 跨对话查看消息
+
+```
+用户A（群1）: 看看群 987654321 最近都在聊什么
+LLM: 群 987654321 最近 20 条消息:
+     [14:02:11] 张三: 今晚不回家吃饭了
+     [14:03:30] 李四: 那明天中午聚餐？
+     ...
+```
+
+LLM 可先调用 `list_archived_groups` 知道哪些群有归档，再调用 `get_group_message_history(group_id, count)` 查看内容，并结合"可靠记忆"长期掌握各群动态。
+
+> ⚠️ 查看范围受联动插件归档内容限制（仅群聊、需先积累归档、脱敏配置会影响内容）。
+
+## 安全配置（WebUI 可视化）
+
+所有配置项均可直接在 **AstrBot WebUI → 插件管理 → 跨群消息转发（特殊版）→ 配置** 中修改，无需编辑代码：
+
+| 配置项 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| `log_dir` | string | `data/workspaces/group_logs` | 🆕 日志归档目录（与联动插件 `output_dir` 一致） |
+| `admin_only` | bool | `true` | 仅 AstrBot 管理员可用 |
+| `allowed_user_ids` | list | `[]` | 允许使用的用户 QQ 号（`admin_only=false` 时生效） |
+| `allowed_groups` | list | `[]` | 目标群白名单：仅允许向这些群发送消息，留空不限制 |
+
+- **目标群白名单**：防止 LLM 被 prompt 注入诱导向任意群发送垃圾消息
+- **审计日志**：所有发送操作（时间/工具/目标/内容摘要/成败）记录在
+  `AstrBot/data/plugins/group_forwarder_special/audit.log`（JSON Lines），便于事后追查
+
+## 实现原理
+
+- 底层使用 OneBot v11 原生 API（`send_group_msg` / `send_private_msg` / `send_forward_msg`）
+- 通过 `event.bot`（aiocqhttp 的 CQHttp 客户端实例）直接调用，NapCat 原生支持
+- 因此**不依赖** unified_msg_origin，可以直接指定任意群 UID / 用户 QQ 发送
+- 历史消息：读取联动插件 `astrbot_plugin_group_log_archive` 的按天/按群纯文本归档，正则解析群号/昵称/时间/内容
+
+## 安装
+
+1. 克隆本仓库到 `AstrBot/data/plugins/` 目录
+2. 同时安装联动插件：https://github.com/Fangnai-byte/astrbot_plugin_group_log_archive
+3. 在 AstrBot WebUI 的插件管理页中启用两个插件（或重启 AstrBot）
+4. 完成！现在可以跨群发送 + 跨对话查看消息
+
+## 使用示例
+
+```
+用户A（群1）: 帮我给群 987654321 发条消息：今晚不回家吃饭了
+LLM: ✅ 已成功向群 987654321 发送消息
+
+用户A: 看看工作群（123456789）昨天聊了什么
+LLM: 群 123456789 最近 20 条消息:
+     [2026-08-22 17:20:05] 王五: 明早 10 点开会
+     ...
+```
+
+## 注意事项
+
+- 本插件依赖 `event.bot`（aiocqhttp 适配器），仅适用于 NapCat / OneBot v11 接入方式
+- 机器人需要先加入目标群才能向其发送消息；私聊需对方未拒绝接收机器人消息
+- 合并转发依赖 NapCat 的 `send_forward_msg` 扩展 API
+- 跨对话查看依赖联动插件 `astrbot_plugin_group_log_archive` 的归档产物，请保证其正常运行
+- 请谨慎授权使用，防止 LLM 被诱导向任意群发送垃圾消息

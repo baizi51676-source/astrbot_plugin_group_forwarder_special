@@ -1,0 +1,26 @@
+{
+  "log_dir": {
+    "description": "群聊日志归档目录（联动 astrbot_plugin_group_log_archive 的输出目录）",
+    "type": "string",
+    "default": "data/workspaces/group_logs",
+    "hint": "留空使用默认 data/workspaces/group_logs。需与日志归档插件的 output_dir 配置保持一致。"
+  },
+  "admin_only": {
+    "description": "仅管理员可以使用",
+    "type": "bool",
+    "default": true,
+    "hint": "开启后只有 AstrBot 管理员可以调用本插件的发送工具。关闭后，下方用户名单中的用户也可使用。"
+  },
+  "allowed_user_ids": {
+    "description": "允许使用的用户 QQ 号列表",
+    "type": "list",
+    "default": [],
+    "hint": "admin_only 关闭时生效。填写可调用工具的 QQ 号，例如 [\"123456\", \"789012\"]"
+  },
+  "allowed_groups": {
+    "description": "目标群白名单：仅允许向这些群发送消息",
+    "type": "list",
+    "default": [],
+    "hint": "留空表示不限制。填写群号列表，例如 [\"123456789\", \"987654321\"]。可防止 LLM 被诱导向任意群发送垃圾消息。"
+  }
+}
