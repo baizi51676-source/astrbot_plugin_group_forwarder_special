@@ -226,10 +226,11 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 内�
 
         同时匹配两类联动文件（分布在两个数据源目录）：
         - astrbot_<群号>_YYYY-MM-DD.log（astrbot_plugin_group_log_archive）
-        - napcat_<群号>_YYYY-MM-DD.jsonl（astrbot_plugin_napcat_history_exporter）
+        - napcat_<群号>_YYYY-MM-DD.jsonl（旧版导出器，按天分文件）
+        - napcat_<群号>.jsonl（新版导出器 v1.1.0+，单文件合并）
         """
         gid = group_id.strip()
-        prefixes = (f"astrbot_{gid}_", f"napcat_{gid}_")
+        prefixes = (f"astrbot_{gid}_", f"napcat_{gid}_", f"napcat_{gid}.jsonl")
         files: list = []
         for log_dir in self._archive_dirs():
             files += [p for p in log_dir.iterdir()
@@ -276,8 +277,10 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 内�
         gid = group_id.strip()
         files = self._group_archive_files(gid)
         if date:
-            wanted = f"astrbot_{gid}_{date}.log"
-            files = [p for p in files if p.name == wanted]
+            # 旧格式按天日志文件精确匹配；jsonl 单文件（不分天）保留后行级过滤
+            wanted_log = f"astrbot_{gid}_{date}.log"
+            files = [p for p in files
+                     if p.name == wanted_log or p.name.endswith(".jsonl")]
         kw = keyword.strip() if keyword else None
         uid = user_id.strip() if user_id else None
         nick = nickname.strip() if nickname else None
@@ -293,6 +296,12 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 内�
                 info = self._parse_archive_line(raw)
                 if not info:
                     continue
+                # 行级日期过滤：JSONL 行 time 含日期；日志行 time 只有时间，
+                # 由文件级过滤（文件名含日期）保证
+                if date:
+                    _full_t = str(info.get("time", ""))
+                    if len(_full_t) >= 10 and not _full_t.startswith(date):
+                        continue
                 if kw and kw.lower() not in info["content"].lower():
                     continue
                 if uid:
@@ -322,11 +331,17 @@ group_chat_context | pre-config:GroupMessage:123456789 | [昵称/01:33:55]: 内�
             for p in log_dir.iterdir():
                 if not p.is_file() or not p.name.startswith(("astrbot_", "napcat_")):
                     continue
+                # 旧格式：astrbot_<群>_YYYY-MM-DD.log / napcat_<群>_YYYY-MM-DD.jsonl
                 m = re.match(
                     r"(?:astrbot|napcat)_(.+?)_\d{4}-\d{2}-\d{2}\.(?:log|jsonl)$",
                     p.name)
                 if m:
                     groups.add(m.group(1))
+                    continue
+                # 新格式：napcat_<群>.jsonl（v1.1.0 单文件）
+                m2 = re.match(r"napcat_(\d+)\.jsonl$", p.name)
+                if m2:
+                    groups.add(m2.group(1))
         return sorted(groups)
 
     async def _send_to_group(self, event: AstrMessageEvent, group_id: str,
