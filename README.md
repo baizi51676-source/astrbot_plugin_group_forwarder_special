@@ -1,5 +1,13 @@
 # 跨群消息转发插件·特殊版 (astrbot_plugin_group_forwarder_special)
 
+> ## ⚠️ 维护模式公告（重要）
+>
+> **本插件已停止功能开发，进入维护模式**（仅修复问题，不再新增功能）。
+>
+> **跨对话查看消息与归档搜索功能已整合到 [`astrbot_plugin_napcat_history_exporter`](https://github.com/baizi51676-source/astrbot_plugin_napcat_history_exporter)（v1.4.0+）**，新用户请直接使用导出器插件的 `get_group_message_history` / `search_archived_messages` / `list_archived_groups` 工具。
+>
+> **本特殊版插件仅支持 napcat 历史消息导出器 v1.3.3**（联动兼容性以 v1.3.3 为限；v1.4.0 起导出器不再提供联动机制，两者不再互通）。
+
 > ⭐ **特殊版 = 原版全部功能 + 跨对话查看消息（联动日志归档插件）**
 
 给 LLM 提供工具，使其可以在一个聊天中，向其他 QQ 群（**按群号/群 UID 指定**）发送文字/图片/语音/文件/合并转发消息、向指定 QQ 用户发送私聊消息，并**跨对话查看**各群的聊天记录。
